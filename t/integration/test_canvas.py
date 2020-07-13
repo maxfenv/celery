@@ -890,8 +890,8 @@ class test_chord:
                 chord_error.s()),
         )
         res = c1()
-        with pytest.raises(ExpectedException):
-            res.get(propagate=True, timeout=10)
+        with pytest.raises(ChordError):
+            res.get(propagate=True, timeout=TIMEOUT)
 
     @pytest.mark.flaky(reruns=5, reruns_delay=1, cause=is_retryable_exception)
     def test_parallel_chords(self, manager):
