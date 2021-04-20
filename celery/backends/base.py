@@ -170,7 +170,7 @@ class Backend(object):
         if request:
             if request.chord:
                 self.on_chord_part_return(request, state, exc)
-            elif request.chain and 'chord' in request.chain[-1]['options']:
+            elif getattr(request, 'chain', None) and 'chord' in request.chain[-1]['options']:
                 from celery.app.task import Context
                 failed_ctx = Context(request.chain[-1])
                 failed_ctx.update(failed_ctx.options)
