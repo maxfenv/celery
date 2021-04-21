@@ -41,6 +41,8 @@ from celery.utils.serialization import (create_exception_cls,
                                         raise_with_context)
 from celery.utils.time import get_exponential_backoff_interval
 
+import pprint
+
 __all__ = ('BaseBackend', 'KeyValueStoreBackend', 'DisabledBackend')
 
 EXCEPTION_ABLE_CODECS = frozenset({'pickle'})
@@ -170,13 +172,16 @@ class Backend(object):
         if request:
             if request.chord:
                 self.on_chord_part_return(request, state, exc)
-            elif getattr(request, 'chain', None) and 'chord' in request.chain[-1]['options']:
-                from celery.app.task import Context
-                failed_ctx = Context(request.chain[-1])
-                failed_ctx.update(failed_ctx.options)
-                failed_ctx.id = failed_ctx.options['task_id']
-                failed_ctx.group = failed_ctx.options['group_id']
-                self.on_chord_part_return(failed_ctx, state, exc)
+            elif getattr(request, 'chain', None):
+                group_contexts = [c for c in request.chain
+                                  if 'chord' in c['options']]
+                if group_contexts:
+                    from celery.app.task import Context
+                    failed_ctx = Context(group_contexts[0])
+                    failed_ctx.update(failed_ctx.options)
+                    failed_ctx.id = failed_ctx.options['task_id']
+                    failed_ctx.group = failed_ctx.options['group_id']
+                    self.on_chord_part_return(failed_ctx, state, exc)
             if call_errbacks and request.errbacks:
                 self._call_task_errbacks(request, exc, traceback)
 
