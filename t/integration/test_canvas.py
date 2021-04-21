@@ -929,6 +929,42 @@ class test_chord:
         with pytest.raises(ChordError):
             res.get(propagate=True, timeout=TIMEOUT)
 
+    def test_chain_in_middle_of_chord_on_error_in_2nd_task(self, manager):
+        if not manager.app.conf.result_backend.startswith('redis'):
+            raise pytest.skip('Requires redis result backend.')
+
+        # Run the chord and wait for the error callback to finish.
+        c1 = chord(
+            header=[
+                add.s(1, 2),
+                chain(add.s(1, 2), fail.s(), add.s(3, 4), add.s(7, 8)),
+                add.s(3, 4)
+            ],
+            body=print_unicode.s('This should not be called').on_error(
+                chord_error.s()),
+        )
+        res = c1()
+        with pytest.raises(ChordError):
+            res.get(propagate=True, timeout=TIMEOUT)
+
+    def test_chain_in_middle_of_chord_on_error_in_1st_task(self, manager):
+        if not manager.app.conf.result_backend.startswith('redis'):
+            raise pytest.skip('Requires redis result backend.')
+
+        # Run the chord and wait for the error callback to finish.
+        c1 = chord(
+            header=[
+                add.s(1, 2),
+                chain(fail.s(), add.s(3, 4), add.s(7, 8)),
+                add.s(3, 4)
+            ],
+            body=print_unicode.s('This should not be called').on_error(
+                chord_error.s()),
+        )
+        res = c1()
+        with pytest.raises(ChordError):
+            res.get(propagate=True, timeout=TIMEOUT)
+
     def test_chain_in_middle_of_chord(self, manager):
         if not manager.app.conf.result_backend.startswith('redis'):
             raise pytest.skip('Requires redis result backend.')
@@ -937,10 +973,10 @@ class test_chord:
         c1 = chord(
             header=[
                 add.s(1, 2),
-                chain(add.s(1, 2), add.s(3, 4), add.s(5, 6),
+                chain(add.si(1, 2), add.si(3, 4), add.si(5, 6)),
                 add.s(3, 4)
             ],
-            body=add.s(7, 8).on_error(
+            body=add.si(7, 8).on_error(
                 chord_error.s()),
         )
         res = c1()
