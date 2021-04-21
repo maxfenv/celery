@@ -893,6 +893,59 @@ class test_chord:
         with pytest.raises(ChordError):
             res.get(propagate=True, timeout=TIMEOUT)
 
+    def test_chain_in_chord_on_error_in_last_task(self, manager):
+        if not manager.app.conf.result_backend.startswith('redis'):
+            raise pytest.skip('Requires redis result backend.')
+
+        # Run the chord and wait for the error callback to finish.
+        c1 = chord(
+            header=[
+                add.s(1, 2),
+                add.s(3, 4),
+                chain(add.s(1, 2), add.s(3, 4), fail.s())
+            ],
+            body=print_unicode.s('This should not be called').on_error(
+                chord_error.s()),
+        )
+        res = c1()
+        with pytest.raises(ChordError):
+            res.get(propagate=True, timeout=TIMEOUT)
+
+    def test_chain_in_middle_of_chord_on_error(self, manager):
+        if not manager.app.conf.result_backend.startswith('redis'):
+            raise pytest.skip('Requires redis result backend.')
+
+        # Run the chord and wait for the error callback to finish.
+        c1 = chord(
+            header=[
+                add.s(1, 2),
+                chain(add.s(1, 2), add.s(3, 4), fail.s()),
+                add.s(3, 4)
+            ],
+            body=print_unicode.s('This should not be called').on_error(
+                chord_error.s()),
+        )
+        res = c1()
+        with pytest.raises(ChordError):
+            res.get(propagate=True, timeout=TIMEOUT)
+
+    def test_chain_in_middle_of_chord(self, manager):
+        if not manager.app.conf.result_backend.startswith('redis'):
+            raise pytest.skip('Requires redis result backend.')
+
+        # Run the chord and wait for the error callback to finish.
+        c1 = chord(
+            header=[
+                add.s(1, 2),
+                chain(add.s(1, 2), add.s(3, 4), add.s(5, 6),
+                add.s(3, 4)
+            ],
+            body=add.s(7, 8).on_error(
+                chord_error.s()),
+        )
+        res = c1()
+        assert res.get(propagate=True, timeout=TIMEOUT) == 15
+
     @pytest.mark.flaky(reruns=5, reruns_delay=1, cause=is_retryable_exception)
     def test_parallel_chords(self, manager):
         try:
